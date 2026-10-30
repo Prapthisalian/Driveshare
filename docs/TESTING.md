@@ -69,6 +69,10 @@ Concurrency assertions use simultaneous Promise requests to the real transaction
 
 The clock abstraction freezes exact times for policy and integration tests, removing millisecond drift at grace/interval boundaries. Interactive demo time uses a continuing offset instead, never the browser or operating-system clock.
 
+Additional `workflows.test.ts` cases verify listing/approval lifecycle, preserved booking terms, protected schedules, completed reviews, simultaneous HTTP requests, multi-day blocking, notification reads and production gates.
+
+The committed `scripts/smoke-api.mjs` also checks a fresh demonstration origin end to end: health, seven approved seed spaces, cookie login, a real reservation, simulated payment, cancellation and a balanced refund. Set `SMOKE_URL` to the origin being tested; Docker CI defaults to `http://localhost:8080`. It intentionally makes simulated transactions in the fictional driver4 account.
+
 ## Reports and routine maintenance
 
 ```bash

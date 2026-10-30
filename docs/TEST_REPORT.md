@@ -8,18 +8,20 @@ Windows / PowerShell; Node.js 24.18.0; npm 11.16.0; isolated real PostgreSQL 17.
 
 ## Executed verification
 
-| Check                                   | Observed result                                                                                                     |
-| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Prisma generation and TypeScript checks | Passed for backend and frontend                                                                                     |
-| Production JavaScript builds            | Passed for API and Vite frontend                                                                                    |
-| Both SQL migrations                     | Applied successfully to a new local PostgreSQL database; repeat deploy reports no pending migrations                |
-| Fictional seed                          | Created seven accounts, eight spaces, recurring hours and scenario records; repeat seed skipped without overwriting |
-| Final expanded backend suite            | 77 passed, 0 failed across 5 test files                                                                             |
-| Playwright browser journeys             | 6 passed, 0 failed after fixing editable-schedule serialization and an ambiguous test selector                      |
-| npm dependency audit                    | 0 known vulnerabilities after updating dependencies to patched stable releases                                      |
-| Local app and API HTTP checks           | Frontend returned 200; database-backed API health succeeded                                                         |
-| Visual inspection                       | Desktop landing/discovery screenshots reviewed; mobile discovery fits a 390px viewport                              |
-| Clean local Git clone installation      | Pending final source commit and isolated installation check                                                         |
+| Check                                   | Observed result                                                                                                                                   |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Prisma generation and TypeScript checks | Passed for backend and frontend                                                                                                                   |
+| Production JavaScript builds            | Passed for API and Vite frontend                                                                                                                  |
+| Both SQL migrations                     | Applied successfully to a new local PostgreSQL database; repeat deploy reports no pending migrations                                              |
+| Fictional seed                          | Created seven accounts, eight spaces, recurring hours and scenario records; repeat seed skipped without overwriting                               |
+| Final expanded backend suite            | 77 passed, 0 failed across 5 test files                                                                                                           |
+| Playwright browser journeys             | 6 passed, 0 failed after fixing editable-schedule serialization and an ambiguous test selector                                                    |
+| npm dependency audit                    | 0 known vulnerabilities after updating dependencies to patched stable releases                                                                    |
+| Local app and API HTTP checks           | Frontend returned 200; database-backed API health succeeded                                                                                       |
+| Visual inspection                       | Desktop landing/discovery screenshots reviewed; mobile discovery fits a 390px viewport                                                            |
+| Clean local Git clone installation      | Passed: `git clone --no-hardlinks`, `npm ci`, both builds, both migrations and idempotent seed against `driveshare_fresh_test`                    |
+| Compiled app from that clone            | Passed HTTP 200, cookie login, reservation, simulated payment, cancellation, balanced refund and browser rendering with 7 cards and 0 page errors |
+| Explicit demo reset                     | Passed against the disposable fresh-test database after fixing root npm argument forwarding; reseed succeeded and a second seed preserved data    |
 
 The backend suite uses actual PostgreSQL constraints and transactions. It covers eight-table existence, foreign keys, restricted history deletion, temporal overlap rules, adjacent intervals, terminal/waitlist nonblocking semantics, physical occupancy uniqueness, schedule constraints, payment replay/failure/retry/refunds, fine boundaries/caps/disputes, no-show reversal, next-driver protection, session invalidation, ownership and CSRF. Additional workflows verify listing approval, immutable booking terms, valid schedule saves, completed reviews, HTTP concurrency, multi-day owner blocks, notification read state and production demo/secret gates.
 
@@ -33,6 +35,9 @@ Concurrency tests include twelve simultaneous reservations, eight simultaneous H
 4. Host schedule save sent uneditable database metadata into a strict schema. The editor now sends an explicit field allowlist; the browser save journey passed afterward.
 5. A browser locator matched both “On map” and “View on map”. The assertion now uses an exact accessible name.
 6. Initial dependency pins had audit findings. Updated stable versions and Prisma's PostgreSQL adapter removed all reported vulnerabilities; no force audit upgrade was used.
+7. The native root reset command initially let npm consume `--confirm`. It now forwards arguments with an explicit `--`; actual reset, reseed and idempotent repeat seed were executed successfully against the disposable fresh-test database.
+
+The clean installation check cloned local commit `be5dacc`, without sharing its node_modules or environment file. It used a new PostgreSQL database and freshly installed dependencies. The reset forwarding fix was then applied identically to the source and disposable clone and verified by executing the documented command. The clone's compiled API ran on port 4500, with its compiled frontend served on 5500 for isolated smoke/browser checks. This is evidence for a fresh **local Git clone/native install**, not a fresh GitHub download or a Docker installation. Remote GitHub contents have not been updated because pushing has not been authorized.
 
 ## Unverified gates and external limits
 
