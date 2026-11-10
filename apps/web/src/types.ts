@@ -80,6 +80,7 @@ export interface Dispute {
   responses: { actor: string; at: string; detail: string }[];
 }
 export interface Booking {
+  createdAt: string;
   id: string;
   driverId: string;
   parkingSpotId: string;

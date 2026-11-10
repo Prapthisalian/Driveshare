@@ -5,11 +5,23 @@ import { demo } from '../src/config.js';
 import { policy } from '../src/policies.js';
 import { now } from '../src/clock.js';
 import { randomUUID } from 'node:crypto';
+import { campusSpaces } from './campus-seed.js';
 
 export async function seed() {
   if (!demo) throw new Error('Seeding requires DEMO_MODE=true and NODE_ENV other than production.');
   if (await db.user.findUnique({ where: { email: 'admin@driveshare.demo' } })) {
-    console.log('Demo data already exists; seed skipped. Use db:reset for an explicit reset.');
+    const owners = await db.user.findMany({
+      where: { email: { in: ['owner@driveshare.demo', 'owner2@driveshare.demo'] } },
+      orderBy: { email: 'asc' },
+    });
+    const orderedOwners = ['owner@driveshare.demo', 'owner2@driveshare.demo']
+      .map((email) => owners.find((u) => u.email === email)?.id)
+      .filter((id): id is string => Boolean(id));
+    if (orderedOwners.length)
+      await db.$transaction((tx) => campusSpaces(tx, orderedOwners), { timeout: 30000 });
+    console.log(
+      'Existing records preserved; stable-ID Sahyadri demo spaces ensured without duplicates.',
+    );
     return;
   }
   const hash = await bcrypt.hash('DriveShareDemo!23', 12);
@@ -49,54 +61,7 @@ export async function seed() {
             },
           }),
         );
-      const names = [
-        'The Courtyard · Campus Gate',
-        'Greenview Residence',
-        'Library Lane Parking',
-        'The Banyan House',
-        'Maple Court · East Wing',
-        'Garden Terrace',
-        'Metro Corner',
-        'The Quiet Driveway',
-      ];
-      const types = ['COVERED', 'GATED', 'OPEN', 'COVERED', 'GATED', 'OPEN', 'COVERED', 'OPEN'];
-      const spots = [];
-      for (let i = 0; i < 8; i++) {
-        const spot = await tx.parkingSpot.create({
-          data: {
-            ownerId: users[(i % 2) + 1].id,
-            title: names[i],
-            description:
-              'A thoughtfully maintained private parking space near the fictional DriveShare University campus. Easy access, a helpful host, and a quieter arrival. Demonstration listing; not a real parking offer.',
-            address: `${14 + i * 7}, ${['University campus', 'Indiranagar', 'Koramangala', 'Jayanagar'][i % 4]} Road, Bengaluru (fictional demo)`,
-            city: 'Bengaluru',
-            latitude: 12.9346 + [0.001, 0.005, -0.004, 0.007, -0.007, 0.002, -0.003, 0.008][i],
-            longitude: 77.6057 + [0.002, -0.004, 0.005, 0.008, -0.006, -0.008, 0.009, -0.002][i],
-            hourlyPrice: [4000, 6000, 2500, 5000, 3500, 2000, 7500, 3000][i],
-            vehicleTypes: i === 5 ? ['TWO_WHEELER'] : ['CAR', 'TWO_WHEELER'],
-            parkingType: types[i],
-            spotNumber: `P-${i + 1}`,
-            accessInstructions:
-              'Call the host at the gate. Park within the marked bay. Owner must verify entry and exit.',
-            images: [`/demo/parking-${(i % 3) + 1}.svg`],
-            approvalStatus: i === 7 ? 'PENDING' : 'APPROVED',
-            permissionConfirmed: true,
-            audit: [{ action: 'DEMO_SEEDED', at: now().toISOString() }],
-          },
-        });
-        for (let day = 0; day < 7; day++)
-          await tx.availabilitySlot.create({
-            data: {
-              parkingSpotId: spot.id,
-              dayOfWeek: day,
-              startTime: '00:00',
-              endTime: '24:00',
-              effectiveFrom: new Date('2020-01-01'),
-              effectiveUntil: new Date('2099-12-31'),
-            },
-          });
-        spots.push(spot);
-      }
+      const spots = await campusSpaces(tx, [users[1].id, users[2].id]);
       const t = +now(),
         minute = 60000;
       async function booking(

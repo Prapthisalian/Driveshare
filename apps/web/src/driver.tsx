@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import { api, post, money, dateTime, label, queryClient } from './api';
 import type { Booking, Vehicle, Payment } from './types';
+import { HostBookings } from './HostBookings';
+import { durationText } from './booking-time';
 import {
   useAuth,
   useToast,
@@ -44,7 +46,7 @@ export function useBookings(owner = false) {
   return useQuery({
     queryKey: ['bookings', owner],
     queryFn: () => api<Booking[]>(`/bookings${owner ? '?scope=owner' : ''}`),
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
 }
 export function BookingRow({ booking: b }: { booking: Booking }) {
@@ -53,6 +55,7 @@ export function BookingRow({ booking: b }: { booking: Booking }) {
       <img src={b.spot.images[0] ?? '/demo/parking-1.svg'} alt="" />
       <div className="booking-row-main">
         <h3>{b.termsSnapshot.title ?? b.spot.title}</h3>
+        <code className="booking-reference">{b.id}</code>
         <p>
           <CalendarDays size={14} />
           {dateTime(b.startTime)} — {dateTime(b.endTime)}
@@ -305,7 +308,11 @@ export function Bookings({ owner = false }: { owner?: boolean }) {
       ) : (
         <div className="panel">
           {list.length ? (
-            list.map((b) => <BookingRow key={b.id} booking={b} />)
+            owner ? (
+              <HostBookings bookings={list} />
+            ) : (
+              list.map((b) => <BookingRow key={b.id} booking={b} />)
+            )
           ) : (
             <Empty
               title="Nothing here just yet"
@@ -371,7 +378,7 @@ export function BookingDetails() {
         All reservations
       </Link>
       <PageTitle
-        eyebrow={`RESERVATION ${b.id.slice(0, 8).toUpperCase()}`}
+        eyebrow="RESERVATION DETAILS"
         title={b.termsSnapshot.title ?? b.spot.title}
         action={<Badge value={b.bookingStatus} />}
       />
@@ -403,9 +410,12 @@ export function BookingDetails() {
         <div>
           <div className="panel padded">
             <div className="row">
-              <h2>Your reservation</h2>
+              <h2>Reservation summary</h2>
               <Badge value={b.paymentStatus} />
             </div>
+            <p className="small muted">
+              Booking ID <code className="booking-detail-id">{b.id}</code>
+            </p>
             <div className="booking-summary-grid">
               <div>
                 <span>ARRIVE</span>
@@ -414,11 +424,13 @@ export function BookingDetails() {
               <div>
                 <span>LEAVE</span>
                 <strong>{dateTime(b.endTime, b.termsSnapshot.timezone)}</strong>
+                <small>{durationText({ start: b.startTime, end: b.endTime })}</small>
               </div>
               <div>
                 <span>VEHICLE</span>
                 <strong>{b.vehicle.vehicleModel}</strong>
                 <small>{b.vehicle.registrationNumber}</small>
+                {(owner || admin) && b.driver && <small>Driver: {b.driver.fullName}</small>}
               </div>
               <div>
                 <span>RESERVATION TOTAL</span>

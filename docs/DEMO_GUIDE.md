@@ -1,18 +1,18 @@
 # Classroom demonstration guide
 
-All people, locations, vehicles, images and reviews are fictional. Every payment screen states **DEMO PAYMENT — NO REAL MONEY WILL BE CHARGED**. Use separate browser profiles/private windows for simultaneous roles. Accounts are listed in README; all passwords are `DriveShareDemo!23` in the local demo only.
+The campus is real. The parking listings, people, vehicles, images and reviews are fictional. Every payment screen states **DEMO PAYMENT — NO REAL MONEY WILL BE CHARGED**. Use separate browser profiles or private windows for simultaneous roles. The [demo account sheet](../DEMO_ACCOUNTS.md) and [five-minute demonstration](../HOW_TO_DEMONSTRATE_DRIVESHARE.md) cover the primary driver and host journey. The examples below use the same local demo password, `DriveShareDemo!23`.
 
 The seed is relative to API startup time. Start with a fresh demo seed for a predictable presentation; keep the API running. Do not wait hours for an overstay: the seed already includes one. Admin overview can advance demo time 35 minutes and restore real time; production disables these controls. Reset uses an explicit local CLI command, not an unauthenticated web endpoint.
 
 ## 1. Normal booking
 
 1. Sign in as `driver4@driveshare.demo`.
-2. Open Find parking. The default map is a labelled fictional campus illustration with interactive markers.
-3. Choose **Maple Court · East Wing** (or an unreserved approved listing). Select a future hour, your vehicle and Reserve this space.
-4. Inspect the server-calculated price and five-minute hold. Choose Demo UPI/Card/Cash.
-5. Select Complete Demo Payment. Booking details show CONFIRMED, payment history and original terms. My bookings and dashboard show the reservation.
+2. Open Find Parking. The map centres on Sahyadri College and shows interactive markers. It has an illustrated offline mode.
+3. Select a future hour and car. Choose **View details** on **Riverside Court** or another available listing.
+4. Inspect the price and select Demo UPI, Demo Card or Demo Cash. Select **Confirm demo booking**.
+5. Choose **View booking** on the confirmation page for the status, payment history and original terms. My Bookings and the driver dashboard also show the reservation.
 
-No bank, card or UPI details are collected. Simulate Payment Failure can be shown first; retry succeeds within the original hold lifetime. Cancelling payment releases an unoccupied hold.
+The advanced payment page for an existing hold can simulate a failure and retry within the hold's original lifetime. Cancelling payment releases an unoccupied hold.
 
 ## 2. Double-booking prevention
 
@@ -32,7 +32,7 @@ For a time-sensitive fee demonstration use admin clock advance or choose a start
 
 ## 4. Overstay and verified departure
 
-1. As `driver@driveshare.demo`, open the seeded overdue **The Courtyard · Campus Gate** session. It ended approximately 35 minutes before seeding; a ₹40 provisional fine is immediately demonstrable, increasing with real elapsed time according to policy.
+1. As `driver@driveshare.demo`, open the seeded overdue **Sahyadri Gate Courtyard** session. It ended approximately 35 minutes before seeding, with an initial provisional fine of ₹40 that increases with elapsed time. Databases seeded before the redesign retain their original booking titles and history.
 2. In the host profile `owner@driveshare.demo`, open Reservations and that session. Inspect physical occupancy.
 3. The driver requests checkout. The host physically verifies departure and chooses Verify departure & checkout.
 4. The fine becomes finalized, the booking COMPLETED and occupied=false. The driver selects Pay demo fine and completes the explicitly simulated payment.
@@ -41,7 +41,7 @@ To show a newly created overstay: make/pay a reservation starting shortly, have 
 
 ## 5. Waiting list
 
-1. `driver2@driveshare.demo` has a future confirmed **Library Lane Parking** booking approximately two hours after seeding.
+1. `driver2@driveshare.demo` has a future confirmed **College Road Parking** booking approximately two hours after fresh seeding.
 2. `driver3@driveshare.demo` has a matching nonblocking waiting entry.
 3. Cancel the confirmed booking as driver2. In driver3's Notifications, see that the interval was released (polling may take up to 15 seconds).
 4. Open the waiting entry and Try reserving released space, then explicitly make demo payment.
@@ -68,7 +68,7 @@ Do this before completing scenario 4, since confirmed departure intentionally re
 
 ## Disputes, unfair fines and no-shows
 
-Admin → Disputes includes a seeded completed Greenview session whose fine is disputed because the host was delayed. Inspect driver evidence, record a reason, set fine to zero, and record resolution. A zero-value ADJUSTMENT preserves the administrative event without inventing revenue. A paid-fine reduction creates the corresponding negative refund.
+Admin → Disputes includes a seeded completed **Adyar Garden Residence** session whose fine is disputed because the host was delayed. Inspect driver evidence, record a reason, set fine to zero, and record resolution. A zero-value ADJUSTMENT preserves the administrative event without inventing revenue. A paid-fine reduction creates the corresponding negative refund.
 
 For an occupied contested exit, the administrator must explicitly verify departure before releasing occupancy/finalizing a revised fine. Driver disputes freeze accumulation at dispute time or an earlier cap; host responses are retained. This is human verification, not hardware detection.
 
@@ -107,6 +107,6 @@ A host can report a no-show only after the 30-minute arrival grace period and ex
 17. **Why soft-delete vehicles?** Existing bookings must retain references and history. The active flag removes a vehicle from the garage without deleting its row.
 18. **How do you protect against CSRF?** Unsafe browser requests need the configured Origin and a CSRF nonce bound to the signed HttpOnly session cookie.
 19. **How is the waiting list fair?** Eligible entries are evaluated in joining order, all receive the same notice, and no one is charged automatically. The first successful reservation wins; no exclusive queue position is promised.
-20. **What happens without internet?** After dependencies are installed, the local map/assets, discovery, database, bookings and payments operate locally. External tiles are optional.
+20. **What happens without internet?** After dependencies are installed, the map switches to the bundled illustration with interactive parking markers. Discovery, database access, bookings and demo payments operate locally.
 21. **Is this ready to collect real money?** No. It deliberately has no financial gateway. Payments are fictional ledger entries clearly labelled in the UI.
 22. **What must be verified before claiming full portability?** Clean installation, migrations, seed, tests, browser flow and actual Docker container startup on a Docker-equipped host. Read the execution report for current evidence.

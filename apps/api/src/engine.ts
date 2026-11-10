@@ -127,7 +127,7 @@ export async function reserve(actor: User, input: ReserveInput, acceptingId?: st
     validateInterval(start, end);
     ensure(+end - +start >= 15 * 60000, 400, 'Reserve at least 15 minutes.');
     ensure(
-      +start >= +now() - 60000 && +start < +now() + 366 * 86400000,
+      +start >= +now() && +start < +now() + 366 * 86400000,
       400,
       'Choose a future start time within one year.',
     );
@@ -252,7 +252,7 @@ export async function pay(
   input: { idempotencyKey: string; method: string; outcome: string; type: string },
 ) {
   return transaction(async (tx) => {
-    const { booking: b } = await lockedBooking(tx, id, actor);
+    const { booking: b, spot } = await lockedBooking(tx, id, actor);
     ensure(b.driverId === actor.id, 403, 'Only the booking driver may make demo payments.');
     const key = `${actor.id}:${input.idempotencyKey}`;
     const old = await tx.payment.findUnique({ where: { idempotencyKey: key } });
@@ -310,6 +310,20 @@ export async function pay(
       },
       include: bookingInclude,
     });
+    if (success && !fine) {
+      await notify(
+        tx,
+        spot.ownerId,
+        `New confirmed booking ${id}. ${actor.fullName} reserved ${spot.title}.`,
+        id,
+      );
+      await notify(
+        tx,
+        b.driverId,
+        `Booking ${id} is confirmed. Your host can now see the same reservation.`,
+        id,
+      );
+    }
     return { payment, booking };
   });
 }
@@ -376,6 +390,13 @@ export async function cancelInTransaction(
     `${status === 'NO_SHOW' ? 'Owner reported a no-show. You may dispute this report.' : 'Booking cancelled.'} Simulated refund and fee details are in payment history.`,
     b.id,
   );
+  if (ownerId !== b.driverId)
+    await notify(
+      tx,
+      ownerId,
+      `Booking ${b.id} ${status === 'NO_SHOW' ? 'marked no-show' : 'cancelled'}. ${reason}`,
+      b.id,
+    );
   if (notifyWaiters) await alertWaiters(tx, b.parkingSpotId);
   return result;
 }

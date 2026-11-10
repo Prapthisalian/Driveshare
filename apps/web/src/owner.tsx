@@ -20,8 +20,9 @@ import {
 } from 'lucide-react';
 import { api, post, queryClient, money, label, localInput, dateTime, ApiError } from './api';
 import { useAuth, useToast, Loading, ErrorState, Empty, PageTitle, Stat, Badge, Field } from './ui';
-import { useBookings, BookingRow } from './driver';
 import type { Spot, Payment, Slot, Booking } from './types';
+import { HostBookings } from './HostBookings';
+import { CAMPUS, istToISO } from './booking-time';
 export function useOwnerSpots() {
   return useQuery({ queryKey: ['owner-spots'], queryFn: () => api<Spot[]>('/owner/spots') });
 }
@@ -38,12 +39,13 @@ export function OwnerDashboard() {
     queryKey: ['bookings', true],
     queryFn: () => api<Booking[]>('/bookings?scope=owner'),
     enabled: host,
-    refetchInterval: 15000,
+    refetchInterval: 5000,
   });
   const payments = useQuery({
     queryKey: ['payments', true],
     queryFn: () => api<Payment[]>('/payments?scope=owner'),
     enabled: host,
+    refetchInterval: 5000,
   });
   if (!host)
     return (
@@ -101,13 +103,24 @@ export function OwnerDashboard() {
       />
       <div className="stats-grid">
         <Stat
-          title="Your parking spaces"
+          title="Total parking spaces"
           value={spaces.data?.length ?? 0}
           detail={`${spaces.data?.filter((s) => s.approvalStatus === 'APPROVED').length ?? 0} approved listings`}
           icon={<House size={18} />}
         />
         <Stat
-          title="Vehicles parked"
+          title="Upcoming bookings"
+          value={
+            all.filter(
+              (b) =>
+                b.bookingStatus === 'CONFIRMED' && new Date(b.endTime) > new Date(b.serverTime),
+            ).length
+          }
+          detail="Paid reservations still to arrive"
+          icon={<Clock3 size={18} />}
+        />
+        <Stat
+          title="Active bookings"
           value={occupied.length}
           detail="Owner-verified physical occupancy"
           icon={<CarFront size={18} />}
@@ -117,12 +130,6 @@ export function OwnerDashboard() {
           value={money(net)}
           detail="Successful payments less refunds"
           icon={<Wallet size={18} />}
-        />
-        <Stat
-          title="Overdue vehicles"
-          value={overdue.length}
-          detail="Verify departure to release space"
-          icon={<Clock3 size={18} />}
         />
       </div>
       {overdue.length > 0 && (
@@ -140,34 +147,21 @@ export function OwnerDashboard() {
         </div>
       )}
       <div className="section-heading compact">
-        <h2>On your driveway</h2>
+        <h2>Driver bookings</h2>
         <Link className="text-button" to="/owner/bookings">
           All reservations
           <ArrowUpRight size={16} />
         </Link>
       </div>
-      <div className="panel">
-        {occupied.length ? (
-          occupied.map((b) => <BookingRow key={b.id} booking={b} />)
-        ) : (
-          <Empty
-            title="A quiet moment"
-            text="Checked-in vehicles appear here until you verify departure."
-          />
-        )}
-      </div>
-      <div className="section-heading compact">
-        <h2>Coming to your neighborhood</h2>
-      </div>
-      <div className="panel">
-        {all.filter((b) => b.bookingStatus === 'CONFIRMED').length ? (
-          all
-            .filter((b) => b.bookingStatus === 'CONFIRMED')
-            .map((b) => <BookingRow key={b.id} booking={b} />)
-        ) : (
-          <p className="padded muted">No upcoming reservations.</p>
-        )}
-      </div>
+      <p className="small muted">
+        Live database updates every 5 seconds. Match the full ID with your driver.
+      </p>
+      <HostBookings
+        bookings={all
+          .slice()
+          .sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt))
+          .slice(0, 8)}
+      />
     </>
   );
 }
@@ -272,9 +266,9 @@ export function ListingEditor() {
       title: '',
       description: '',
       address: '',
-      city: 'Bengaluru',
-      latitude: 12.9346,
-      longitude: 77.6057,
+      city: 'Mangaluru',
+      latitude: CAMPUS.latitude,
+      longitude: CAMPUS.longitude,
       timezone: 'Asia/Kolkata',
       hourlyPrice: 40,
       vehicleType: 'BOTH',
@@ -546,8 +540,8 @@ export function Availability() {
     setSaving(true);
     try {
       await post(`/spots/${id}/blocks`, {
-        startTime: new Date(blockStart).toISOString(),
-        endTime: new Date(blockEnd).toISOString(),
+        startTime: istToISO(blockStart.slice(0, 10), blockStart.slice(11)),
+        endTime: istToISO(blockEnd.slice(0, 10), blockEnd.slice(11)),
         reason,
         resolveBookings,
         affectedBookingIds: resolveBookings ? affected.map((b) => b.id) : [],

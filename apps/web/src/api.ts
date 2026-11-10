@@ -1,4 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
+import { istParts } from './booking-time';
 export const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 10000 } },
 });
@@ -44,9 +45,12 @@ export const dateTime = (value: string, zone = 'Asia/Kolkata') =>
     timeZone: zone,
     day: 'numeric',
     month: 'short',
-    hour: 'numeric',
+    hour: '2-digit',
     minute: '2-digit',
+    hourCycle: 'h23',
   });
-export const localInput = (date: Date) =>
-  new Date(+date - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+export const localInput = (date: Date) => {
+  const p = istParts(date);
+  return `${p.date}T${p.time}`;
+};
 export const label = (text: string) => text.toLowerCase().replaceAll('_', ' ');

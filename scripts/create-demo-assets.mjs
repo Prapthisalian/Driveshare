@@ -31,6 +31,6 @@ for (let i = 0; i < 60; i++) {
   map += `<circle cx="${x}" cy="${y}" r="${8 + (i % 5)}" fill="#c0d0ad" opacity=".7"/>`;
 }
 map +=
-  '<g fill="#a7b395" font-family="Arial" font-size="9" letter-spacing="2"><text x="80" y="180">INDIRANAGAR</text><text x="650" y="780">KORAMANGALA</text><text x="100" y="860">JAYANAGAR</text><text x="660" y="250">LIBRARY LANE</text></g>';
+  '<g fill="#a7b395" font-family="Arial" font-size="9" letter-spacing="2"><text x="80" y="180">ADYAR</text><text x="650" y="780">COLLEGE ROAD</text><text x="100" y="860">MANGALURU</text><text x="660" y="250">SAHYADRI AREA</text></g>';
 await writeFile(`${dir}/campus-map.svg`, wrap(1000, 1000, map, '#e9edde'));
 console.log('Created five local, fictional SVG demonstration assets.');

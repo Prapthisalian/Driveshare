@@ -67,13 +67,13 @@ On macOS/Linux use `cp .env.example .env`; the remaining npm commands are the sa
 | `FREE_CANCELLATION_MINUTES`        | Free-cancellation lead time, default 60; snapshotted per booking                                      |
 | `LATE_CANCELLATION_PERCENT`        | Fee within the free-cancellation boundary, default 10                                                 |
 | `AFTER_START_CANCELLATION_PERCENT` | Unoccupied after-start fee, default 25                                                                |
-| `VITE_TILE_URL`                    | Optional licensed/approved tile template; blank uses local map                                        |
+| `VITE_TILE_URL`                    | Optional approved tile URL template. Blank uses OpenStreetMap.                                        |
 | `VITE_TILE_ATTRIBUTION`            | Provider-required attribution; set when enabling external tiles                                       |
 | `TEST_DATABASE_URL`                | Separate integration/browser database ending in `_test`                                               |
 
 Fine policy values are snapshotted into new bookings. Changing configuration does not retroactively change a reservation's fine policy. `VITE_*` values are build-time frontend values and never hold secrets. Native Vite reads `apps/web/.env.local` (ignored) or variables in the launching shell; Docker forwards the root `.env` tile variables as build arguments. Rebuild the frontend after changing tiles.
 
-No external tiles are requested by default. To enable a provider, obtain usage permission, set its URL and attribution, and respect its caching/rate/offline rules. Tile failure switches to the local fictional illustration; booking remains operational. No public geocoder is called; location search uses locally seeded city/area/address data.
+Leaflet requests OpenStreetMap tiles by default with visible attribution. To use a different tile provider, set its URL and attribution and follow its caching, request and offline rules. Tile failure switches to the local illustration with the same parking markers. Location search uses city, area and address fields in the database. [OpenStreetMap tile usage policy](https://operations.osmfoundation.org/policies/tiles/).
 
 ## Stop and reset
 

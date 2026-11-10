@@ -35,7 +35,7 @@ cookie = login.response.headers
 csrf = login.result.csrf;
 assert.ok(cookie && csrf);
 const vehicle = (await request('/vehicles')).result[0];
-const spot = spaces.find((space) => space.title === 'Maple Court · East Wing');
+const spot = spaces.find((space) => space.title === 'Riverside Court');
 assert.ok(vehicle && spot);
 const start = new Date(Date.now() + 2 * 3600000);
 const booking = (

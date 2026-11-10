@@ -34,7 +34,7 @@ All use **`DriveShareDemo!23`** in the local demo environment only.
 | Ananya Iyer | `driver3@driveshare.demo` | Driver, two-wheeler and waiting entry    |
 | Dev Mehta   | `driver4@driveshare.demo` | Driver, protected next reservation       |
 
-Eight illustrated parking listings surround a fictional university campus in Bengaluru. Seven are approved; one awaits review. These are not real parking offers or real reviews.
+Eight fictional parking listings surround Sahyadri College of Engineering & Management in Adyar, Mangaluru. Seven are approved and one awaits review. See the [demo accounts](DEMO_ACCOUNTS.md) and [five-minute demonstration](HOW_TO_DEMONSTRATE_DRIVESHARE.md).
 
 ## Native development
 
@@ -58,7 +58,7 @@ npm run dev
 
 Open **[http://localhost:5173](http://localhost:5173)**. The API listens on port 4000. Use `localhost` as documented so browser Origin matches `APP_ORIGIN`.
 
-If using an existing PostgreSQL installation, create `driveshare` and `driveshare_test`, set `DATABASE_URL` in `.env`, and skip `db:local`. The database role must be able to install `btree_gist` during migration. The helper's binaries download on first `npm ci`, so internet is needed for installation, but not for the default map or normal demo workflows afterward. The optional helper is intended for regular non-root users; Docker is the recommended Linux/root setup.
+If using an existing PostgreSQL installation, create `driveshare` and `driveshare_test`, set `DATABASE_URL` in `.env`, and skip `db:local`. The database role must be able to install `btree_gist` during migration. The helper's binaries download on first `npm ci`. Booking and the local map illustration work offline after installation, and the live OpenStreetMap basemap needs internet access. The helper is intended for regular non-root users. Docker is the recommended Linux/root setup.
 
 ## Verify
 
@@ -87,19 +87,20 @@ Tests refuse to truncate a database whose name does not end in `_test`. Browser 
 
 ## Documentation
 
-| Guide                                        | Contents                                                 |
-| -------------------------------------------- | -------------------------------------------------------- |
-| [Project overview](docs/PROJECT_OVERVIEW.md) | Scope, audience, folder structure and constraints        |
-| [Features](docs/FEATURES.md)                 | Implemented workflows and acceptance checklist           |
-| [Architecture](docs/ARCHITECTURE.md)         | System, roles, security and API reference                |
-| [Database design](docs/DATABASE_DESIGN.md)   | Eight tables, policies, SQL concepts and concurrency     |
-| [ER diagram](docs/ER_DIAGRAM.md)             | All relationships in Mermaid                             |
-| [Booking flow](docs/BOOKING_FLOW.md)         | Reservation, payment, cancellation and overstay diagrams |
-| [Demo guide](docs/DEMO_GUIDE.md)             | Seven scenarios, presentation script and viva answers    |
-| [Installation](docs/INSTALLATION.md)         | Windows-friendly setup and environment variables         |
-| [Troubleshooting](docs/TROUBLESHOOTING.md)   | Logs, port conflicts, reset and common errors            |
-| [Testing](docs/TESTING.md)                   | Test isolation and execution commands                    |
-| [Test report](docs/TEST_REPORT.md)           | Executed results, limitations and unverified gates       |
+| Guide                                            | Contents                                                 |
+| ------------------------------------------------ | -------------------------------------------------------- |
+| [Project overview](docs/PROJECT_OVERVIEW.md)     | Scope, audience, folder structure and constraints        |
+| [Features](docs/FEATURES.md)                     | Implemented workflows and acceptance checklist           |
+| [Architecture](docs/ARCHITECTURE.md)             | System, roles, security and API reference                |
+| [Database design](docs/DATABASE_DESIGN.md)       | Eight tables, policies, SQL concepts and concurrency     |
+| [ER diagram](docs/ER_DIAGRAM.md)                 | All relationships in Mermaid                             |
+| [Booking flow](docs/BOOKING_FLOW.md)             | Reservation, payment, cancellation and overstay diagrams |
+| [Demo guide](docs/DEMO_GUIDE.md)                 | Seven scenarios, presentation script and viva answers    |
+| [Installation](docs/INSTALLATION.md)             | Windows-friendly setup and environment variables         |
+| [Troubleshooting](docs/TROUBLESHOOTING.md)       | Logs, port conflicts, reset and common errors            |
+| [Testing](docs/TESTING.md)                       | Test isolation and execution commands                    |
+| [Redesign verification](docs/REDESIGN_REPORT.md) | Current test results and responsive screenshots          |
+| [Original test report](docs/TEST_REPORT.md)      | Historical test results from the initial implementation  |
 
 ## Deployment boundary
 

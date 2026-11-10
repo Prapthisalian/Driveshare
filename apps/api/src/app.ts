@@ -1,4 +1,5 @@
 import express, { type Request, type Response, type NextFunction } from 'express';
+import { campus } from './campus.js';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
@@ -76,7 +77,8 @@ app.get('/api/config', (_req, res) =>
   res.json({
     demo,
     serverTime: now(),
-    areas: ['Bengaluru', 'University campus', 'Indiranagar', 'Koramangala', 'Jayanagar'],
+    areas: ['Adyar', 'Mangaluru', 'Sahyadri College', 'College Road'],
+    campus,
     policy: {
       holdMinutes: settings.holdMinutes,
       graceMinutes: settings.graceMinutes,
@@ -227,7 +229,15 @@ app.get('/api/spots', async (req, res) => {
     })
     .parse(req.query);
   ensure(Boolean(q.start) === Boolean(q.end), 400, 'Provide both start and end time.');
-  if (q.start && q.end) validateInterval(new Date(q.start), new Date(q.end));
+  if (q.start && q.end) {
+    validateInterval(new Date(q.start), new Date(q.end));
+    ensure(+new Date(q.start) >= +now(), 400, 'Check-in must be in the future.');
+    ensure(
+      +new Date(q.end) - +new Date(q.start) >= 15 * 60000,
+      400,
+      'Reserve at least 15 minutes.',
+    );
+  }
   const spots = await db.parkingSpot.findMany({
     where: {
       approvalStatus: 'APPROVED',
@@ -258,7 +268,13 @@ app.get('/api/spots', async (req, res) => {
             },
           ],
         },
-        select: { occupied: true, endTime: true, bookingStatus: true, holdExpiresAt: true },
+        select: {
+          occupied: true,
+          startTime: true,
+          endTime: true,
+          bookingStatus: true,
+          holdExpiresAt: true,
+        },
       },
       blocks:
         q.start && q.end
@@ -271,7 +287,11 @@ app.get('/api/spots', async (req, res) => {
       const physicallyOccupied = bookings.some((b) => b.occupied);
       const overdue = bookings.some((b) => b.occupied && b.endTime <= now());
       const reserved = bookings.some(
-        (b) => b.bookingStatus !== 'PAYMENT_PENDING' || !b.holdExpiresAt || b.holdExpiresAt > now(),
+        (b) =>
+          (!q.start ||
+            !q.end ||
+            (b.startTime < new Date(q.end) && b.endTime > new Date(q.start))) &&
+          (b.bookingStatus !== 'PAYMENT_PENDING' || !b.holdExpiresAt || b.holdExpiresAt > now()),
       );
       const available =
         q.start && q.end
@@ -286,7 +306,12 @@ app.get('/api/spots', async (req, res) => {
         available,
         rating: reviews.length ? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length : 0,
         reviewCount: reviews.length,
-        distance: distanceKm(q.lat ?? 12.9346, q.lng ?? 77.6057, s.latitude, s.longitude),
+        distance: distanceKm(
+          q.lat ?? campus.latitude,
+          q.lng ?? campus.longitude,
+          s.latitude,
+          s.longitude,
+        ),
       };
     })
     .filter((s) => q.available !== 'true' || s.available)
@@ -494,7 +519,10 @@ app.get('/api/bookings', requireAuth, async (req, res) => {
   res.json(await Promise.all(bookings.map(decorateBooking)));
 });
 app.get('/api/bookings/:id', requireAuth, async (req, res) => {
-  const b = await db.booking.findUnique({ where: { id: id(req) }, include: bookingInclude });
+  const b = await db.booking.findUnique({
+    where: { id: id(req) },
+    include: { ...bookingInclude, driver: { select: { fullName: true } } },
+  });
   ensure(b, 404, 'Booking not found.');
   ensure(
     b.driverId === req.user!.id ||
