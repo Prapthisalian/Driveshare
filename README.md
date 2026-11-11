@@ -11,8 +11,8 @@ A full-stack peer-to-peer micro-parking demonstration: React, TypeScript, Expres
 Install Git and Docker Desktop with Docker Compose, then run:
 
 ```bash
-git clone https://github.com/Siddharth1968/driveshare.git
-cd driveshare
+git clone https://github.com/Prapthisalian/Driveshare.git
+cd Driveshare
 docker compose up --build -d
 ```
 
@@ -106,4 +106,4 @@ Tests refuse to truncate a database whose name does not end in `_test`. Browser 
 
 The repository is designed for reproducible academic demonstrations. A public deployment additionally needs HTTPS, a unique secret, `NODE_ENV=production`, `DEMO_MODE=false`, restricted database credentials, backups and operational review. Production disables seed/reset/clock controls and uses Secure cookies. Email verification delivery, hardware occupancy sensors, real money, cloud storage and push/email notifications are outside this demo's scope. Notifications are durable in-app records and poll while signed in.
 
-This repository retains its original history. Completed work is committed locally; remote pushes require explicit authorization. Never force-push.
+Repository maintained by **Prapthi Salian** ([Prapthisalian/Driveshare](https://github.com/Prapthisalian/Driveshare)). This repository retains its original history. Completed work is committed locally; remote pushes require explicit authorization. Never force-push.

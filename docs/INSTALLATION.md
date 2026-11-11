@@ -7,8 +7,8 @@
 3. Clone the existing official repository and start it:
 
 ```powershell
-git clone https://github.com/Siddharth1968/driveshare.git
-Set-Location driveshare
+git clone https://github.com/Prapthisalian/Driveshare.git
+Set-Location Driveshare
 docker compose up --build -d
 docker compose ps
 docker compose logs api
