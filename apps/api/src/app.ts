@@ -135,11 +135,33 @@ app.post('/api/auth/login', authRate, async (req, res) => {
   );
   res.json({ user: publicUser(user), csrf: await issueSession(res, user) });
 });
+app.post('/api/auth/demo-login', authRate, async (req, res) => {
+  const input = v.demoLogin.parse(req.body);
+  const user = await db.user.findUnique({ where: { email: `${input.role}@driveshare.demo` } });
+  ensure(
+    user && user.accountStatus === 'ACTIVE',
+    401,
+    'Invalid credentials or account unavailable.',
+  );
+  const showcase = input.role === 'admin';
+  res.json({
+    user: publicUser(user, showcase),
+    csrf: await issueSession(res, user, showcase),
+  });
+});
 app.get('/api/auth/me', (req, res) =>
-  res.json({ user: req.user ? publicUser(req.user) : null, csrf: req.csrf ?? null }),
+  res.json({
+    user: req.user ? publicUser(req.user, req.showcase) : null,
+    csrf: req.csrf ?? null,
+  }),
 );
 app.post('/api/auth/logout', requireAuth, async (req, res) => {
-  await db.user.update({ where: { id: req.user!.id }, data: { sessionVersion: { increment: 1 } } });
+  if (!req.showcase) {
+    await db.user.update({
+      where: { id: req.user!.id },
+      data: { sessionVersion: { increment: 1 } },
+    });
+  }
   res
     .clearCookie('driveshare_session', {
       path: '/',
@@ -232,6 +254,11 @@ app.patch('/api/vehicles/:id', requireAuth, async (req, res) => {
 app.delete('/api/vehicles/:id', requireAuth, async (req, res) => {
   const vehicle = await db.vehicle.findUnique({ where: { id: id(req) } });
   ensure(vehicle?.userId === req.user!.id, 403, 'You may only remove your own vehicles.');
+  ensure(
+    !(production && vehicle.registrationNumber === 'DEMO KA 03 AB 1203'),
+    403,
+    'The primary demonstration vehicle cannot be removed in the online demo.',
+  );
   await db.vehicle.update({ where: { id: vehicle.id }, data: { isActive: false } });
   res.json({ ok: true });
 });

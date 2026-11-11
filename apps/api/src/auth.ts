@@ -10,20 +10,26 @@ declare global {
     interface Request {
       user?: User;
       csrf?: string;
+      showcase?: boolean;
     }
   }
 }
-export const publicUser = (u: User) => ({
+export const publicUser = (u: User, showcase = false) => ({
   id: u.id,
   fullName: u.fullName,
   email: u.email,
   phone: u.phone,
   roles: u.roles,
   accountStatus: u.accountStatus,
+  ...(showcase ? { showcase: true } : {}),
 });
-export async function issueSession(res: Response, user: User) {
+export async function issueSession(res: Response, user: User, showcase = false) {
   const csrf = randomUUID();
-  const token = await new SignJWT({ ver: user.sessionVersion, csrf })
+  const token = await new SignJWT({
+    ver: user.sessionVersion,
+    csrf,
+    ...(showcase ? { showcase: true } : {}),
+  })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(user.id)
     .setIssuedAt()
@@ -53,6 +59,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
       if (user && user.accountStatus === 'ACTIVE' && user.sessionVersion === payload.ver) {
         req.user = user;
         req.csrf = String(payload.csrf);
+        req.showcase = payload.showcase === true;
       }
     } catch {
       /* Invalid or expired cookies are treated as unauthenticated. */
@@ -64,6 +71,14 @@ export function requireAuth(req: Request, _res: Response, next: NextFunction) {
   if (!req.user) return next(new AppError(401, 'Please sign in to continue.'));
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.headers['x-csrf-token'] !== req.csrf)
     return next(new AppError(403, 'Security token expired. Refresh the page and try again.'));
+  if (
+    req.showcase &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(req.method) &&
+    req.path !== '/api/auth/logout'
+  )
+    return next(
+      new AppError(403, 'Restricted admin demo is read-only to protect shared demonstration data.'),
+    );
   next();
 }
 export const role = (name: string) => (req: Request, _res: Response, next: NextFunction) => {

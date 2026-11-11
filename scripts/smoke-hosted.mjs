@@ -96,6 +96,41 @@ async function login(page, role, path, hostname) {
   await check(page).toHaveURL(new URL(path, page.url()).href);
 }
 
+async function verifyDemoButtons(page, origin) {
+  const buttons = [
+    ['🚗 Driver Demo', '/'],
+    ['🏠 Host Demo', '/owner'],
+    ['🛡️ Admin Demo', '/admin'],
+  ];
+  for (const [label, expectedPath] of buttons) {
+    await page.goto('/login');
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === '/api/auth/demo-login' && r.request().method() === 'POST',
+      ),
+      page.getByRole('button', { name: label, exact: true }).click(),
+    ]);
+    assert.equal(response.status(), 200, label + ' one-click login failed.');
+    await check(page).toHaveURL(new URL(expectedPath, page.url()).href);
+    if (expectedPath === '/admin') {
+      await check(page.getByTestId('admin-showcase-banner')).toBeVisible();
+      const me = await get(page, '/api/auth/me');
+      const { csrf, user } = await me.json();
+      assert.equal(user?.showcase, true, 'Admin demo must set showcase mode.');
+      const blocked = await page.request.post('/api/admin/users/' + user.id, {
+        headers: { Origin: origin, 'X-CSRF-Token': csrf },
+        data: { accountStatus: 'SUSPENDED', reason: 'Showcase write check' },
+        maxRedirects: 0,
+      });
+      assert.equal(blocked.status(), 403, 'Restricted admin demo must reject mutations.');
+    }
+    await page.goto('/profile');
+    await page.getByRole('button', { name: 'Sign out', exact: true }).click();
+    await check(page).toHaveURL(new URL('/login', page.url()).href);
+  }
+}
+
 async function verifyShell(page) {
   const root = await page.goto('/');
   assert.equal(root?.status(), 200, 'The staging home page must return HTTP 200.');
@@ -244,6 +279,7 @@ async function run() {
     const host = await newPage({ width: 1440, height: 1000 });
     const admin = await newPage({ width: 1440, height: 1000 });
     await verifyShell(driver);
+    await verifyDemoButtons(driver, origin);
     await login(driver, 'driver', '/', hostname);
     await login(host, 'owner', '/owner', hostname);
     await check(host.getByRole('heading', { name: 'Welcome home, Meera.' })).toBeVisible();

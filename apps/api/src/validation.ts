@@ -32,6 +32,11 @@ export const login = z
     password: z.string().min(1).max(72),
   })
   .strict();
+export const demoLogin = z
+  .object({
+    role: z.enum(['driver', 'owner', 'admin']),
+  })
+  .strict();
 export const vehicleSchema = z
   .object({
     registrationNumber: z

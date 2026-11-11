@@ -13,6 +13,7 @@ import {
 import { api, post, queryClient, money, dateTime, label } from './api';
 import type { AdminData, Booking } from './types';
 import {
+  useAuth,
   useConfig,
   useToast,
   PageTitle,
@@ -26,6 +27,8 @@ import {
 } from './ui';
 import { BookingRow } from './driver';
 export function Admin() {
+  const auth = useAuth();
+  const showcase = Boolean(auth.data?.showcase);
   const query = useQuery({
     queryKey: ['admin'],
     queryFn: () => api<AdminData>('/admin/overview'),
@@ -69,6 +72,17 @@ export function Admin() {
         }
         text="Review carefully. Every administrative decision leaves an audit trail."
       />
+      {showcase && (
+        <div className="notice" data-testid="admin-showcase-banner">
+          <ShieldCheck size={20} />
+          <div>
+            <strong>Restricted admin demonstration</strong>
+            <p>
+              Read-only showcase mode protects shared demonstration listings, accounts and disputes.
+            </p>
+          </div>
+        </div>
+      )}
       {section === 'overview' && (
         <>
           <div className="stats-grid">
@@ -187,7 +201,7 @@ export function Admin() {
                 <div className="button-row">
                   <button
                     className="btn btn-sm"
-                    disabled={busy || s.approvalStatus === 'APPROVED'}
+                    disabled={busy || showcase || s.approvalStatus === 'APPROVED'}
                     onClick={() => {
                       const reason = window.prompt(
                         'Approval notes (at least 5 characters):',
@@ -201,7 +215,7 @@ export function Admin() {
                   </button>
                   <button
                     className="btn btn-outline btn-sm"
-                    disabled={busy || s.approvalStatus === 'REJECTED'}
+                    disabled={busy || showcase || s.approvalStatus === 'REJECTED'}
                     onClick={() => {
                       const reason = window.prompt('Explain the rejection:');
                       if (reason)
@@ -241,7 +255,7 @@ export function Admin() {
                   <td>
                     {!u.roles.includes('ADMIN') && (
                       <button
-                        disabled={busy}
+                        disabled={busy || showcase}
                         className="btn btn-outline btn-sm"
                         onClick={() => {
                           const reason = window.prompt(
@@ -271,7 +285,7 @@ export function Admin() {
               <Resolution
                 booking={b}
                 key={b.id}
-                busy={busy}
+                busy={busy || showcase}
                 onResolve={(input) => action(`/bookings/${b.id}/actions/resolve`, input)}
               />
             ))
@@ -292,7 +306,7 @@ export function Admin() {
               <Resolution
                 booking={b}
                 key={b.id}
-                busy={busy}
+                busy={busy || showcase}
                 onResolve={(input) => action(`/bookings/${b.id}/actions/resolve`, input)}
               />
             ))}

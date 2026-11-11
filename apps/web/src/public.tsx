@@ -4,8 +4,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ChevronLeft, ArrowRight } from 'lucide-react';
-import { post, queryClient, setCsrf, label } from './api';
-import { useToast, useConfig, Field, ErrorState } from './ui';
+import { post, queryClient, setCsrf } from './api';
+import { useToast, Field, ErrorState } from './ui';
 import type { User } from './types';
 export { Landing, Explore, SpotDetails } from './search';
 const authSchema = z.object({
@@ -14,41 +14,58 @@ const authSchema = z.object({
   password: z.string().min(10, 'Use at least 10 characters.').max(72),
   owner: z.boolean(),
 });
+const demoRoles = [
+  ['driver', '🚗 Driver Demo'],
+  ['owner', '🏠 Host Demo'],
+  ['admin', '🛡️ Admin Demo'],
+] as const;
 export function AuthPage({ register = false }: { register?: boolean }) {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const toast = useToast();
-  const config = useConfig();
   const form = useForm<z.infer<typeof authSchema>>({
     resolver: zodResolver(authSchema),
     defaultValues: { fullName: '', email: '', password: '', owner: params.get('owner') === 'true' },
   });
+  function completeLogin(data: { user: User; csrf: string }, message: string) {
+    setCsrf(data.csrf);
+    queryClient.clear();
+    queryClient.setQueryData(['me'], data.user);
+    const next = params.get('next');
+    navigate(
+      next?.startsWith('/') && !next.startsWith('//')
+        ? next
+        : data.user.roles.includes('ADMIN')
+          ? '/admin'
+          : data.user.roles.includes('OWNER')
+            ? '/owner'
+            : '/',
+    );
+    toast(message);
+  }
   const mutation = useMutation({
     mutationFn: async (values: z.infer<typeof authSchema>) => {
       if (register && (!values.fullName || values.fullName.trim().length < 2))
         throw new Error('Enter your full name.');
-      const data = await post<{ user: User; csrf: string }>(
+      return post<{ user: User; csrf: string }>(
         register ? '/auth/register' : '/auth/login',
         register ? values : { email: values.email, password: values.password },
       );
-      setCsrf(data.csrf);
-      queryClient.setQueryData(['me'], data.user);
-      return data.user;
     },
-    onSuccess: (user) => {
-      const next = params.get('next');
-      navigate(
-        next?.startsWith('/') && !next.startsWith('//')
-          ? next
-          : user.roles.includes('ADMIN')
-            ? '/admin'
-            : user.roles.includes('OWNER')
-              ? '/owner'
-              : '/',
-      );
-      toast(register ? 'Welcome to the neighborhood.' : 'Welcome back.');
-    },
+    onSuccess: (data) =>
+      completeLogin(data, register ? 'Welcome to the neighborhood.' : 'Welcome back.'),
   });
+  const demoMutation = useMutation({
+    mutationFn: (role: (typeof demoRoles)[number][0]) =>
+      post<{ user: User; csrf: string }>('/auth/demo-login', { role }),
+    onSuccess: (data) =>
+      completeLogin(
+        data,
+        data.user.showcase ? 'Opened restricted admin demonstration.' : 'Welcome back.',
+      ),
+  });
+  const busy = mutation.isPending || demoMutation.isPending;
+  const authError = mutation.error ?? demoMutation.error;
   return (
     <div className="auth-layout">
       <section className="auth-story">
@@ -94,9 +111,9 @@ export function AuthPage({ register = false }: { register?: boolean }) {
               I’d also like to host a parking space
             </label>
           )}
-          {mutation.error && <ErrorState error={mutation.error} />}
-          <button className="btn btn-full" disabled={mutation.isPending}>
-            {mutation.isPending ? 'Just a moment…' : register ? 'Create your account' : 'Sign in'}
+          {authError && <ErrorState error={authError} />}
+          <button className="btn btn-full" disabled={busy}>
+            {busy ? 'Just a moment…' : register ? 'Create your account' : 'Sign in'}
             <ArrowRight size={17} />
           </button>
         </form>
@@ -106,24 +123,20 @@ export function AuthPage({ register = false }: { register?: boolean }) {
             {register ? 'Sign in' : 'Create an account'}
           </Link>
         </p>
-        {config.data?.demo && (
-          <div className="soft-card demo-credentials">
+        {!register && (
+          <div className="soft-card demo-credentials" data-testid="demo-login-panel">
             <strong>Take a look around</strong>
-            <p>
-              Local fictional demo accounts use <code>DriveShareDemo!23</code>
-            </p>
+            <p>One-click demonstration access for Sahyadri campus driver, host and admin flows</p>
             <div className="button-row">
-              {['driver', 'owner', 'admin'].map((role) => (
+              {demoRoles.map(([role, title]) => (
                 <button
                   className="btn btn-outline btn-sm"
                   type="button"
                   key={role}
-                  onClick={() => {
-                    form.setValue('email', `${role}@driveshare.demo`);
-                    form.setValue('password', 'DriveShareDemo!23');
-                  }}
+                  disabled={busy}
+                  onClick={() => demoMutation.mutate(role)}
                 >
-                  {label(role)} demo
+                  {title}
                 </button>
               ))}
             </div>

@@ -161,4 +161,63 @@ describe('HTTP authorization, validation and CSRF', () => {
     expect(search.status).toBe(200);
     expect(await db.user.count()).toBe(5);
   });
+  it('supports one-click demo login and restricts admin demo to read-only showcase', async () => {
+    await db.user.createMany({
+      data: [
+        {
+          fullName: 'Riya Sharma',
+          email: 'driver@driveshare.demo',
+          passwordHash: f.a.passwordHash,
+          roles: ['DRIVER'],
+        },
+        {
+          fullName: 'Meera Nair',
+          email: 'owner@driveshare.demo',
+          passwordHash: f.owner.passwordHash,
+          roles: ['DRIVER', 'OWNER'],
+        },
+        {
+          fullName: 'Aditi Rao',
+          email: 'admin@driveshare.demo',
+          passwordHash: f.admin.passwordHash,
+          roles: ['ADMIN'],
+        },
+      ],
+    });
+    const driverDemo = await request(app)
+      .post('/api/auth/demo-login')
+      .set('Origin', origin)
+      .send({ role: 'driver' });
+    expect(driverDemo.status).toBe(200);
+    expect(driverDemo.body.user.email).toBe('driver@driveshare.demo');
+    expect(driverDemo.body.user.showcase).toBeUndefined();
+
+    const adminDemo = await request(app)
+      .post('/api/auth/demo-login')
+      .set('Origin', origin)
+      .send({ role: 'admin' });
+    expect(adminDemo.status).toBe(200);
+    expect(adminDemo.body.user.email).toBe('admin@driveshare.demo');
+    expect(adminDemo.body.user.showcase).toBe(true);
+    const cookie = adminDemo.headers['set-cookie'];
+    const csrf = adminDemo.body.csrf;
+
+    const overview = await request(app).get('/api/admin/overview').set('Cookie', cookie);
+    expect(overview.status).toBe(200);
+
+    const mutateUser = await request(app)
+      .post(`/api/admin/users/${f.a.id}`)
+      .set('Cookie', cookie)
+      .set('Origin', origin)
+      .set('X-CSRF-Token', csrf)
+      .send({ accountStatus: 'SUSPENDED', reason: 'Showcase mutation attempt' });
+    expect(mutateUser.status).toBe(403);
+
+    const logout = await request(app)
+      .post('/api/auth/logout')
+      .set('Cookie', cookie)
+      .set('Origin', origin)
+      .set('X-CSRF-Token', csrf);
+    expect(logout.status).toBe(200);
+  });
 });
