@@ -7,6 +7,8 @@ const day = 86_400_000;
 const spotName = 'Riverside Court';
 const reason = 'Completed the isolated hosted DriveShare smoke check.';
 const rehearsal = process.env.DRIVESHARE_HOSTED_REHEARSAL === 'true';
+const productionCheck = process.env.DRIVESHARE_VERIFY_PRODUCTION === 'true';
+const productionHost = 'driveshare-two.vercel.app';
 const passwords = {
   driver: process.env.DRIVESHARE_ONLINE_DRIVER_PASSWORD,
   owner: process.env.DRIVESHARE_ONLINE_HOST_PASSWORD,
@@ -19,7 +21,7 @@ const dateFormat = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
-function stagingOrigin() {
+function targetOrigin() {
   let url;
   try {
     url = new URL(process.env.DRIVESHARE_STAGING_URL);
@@ -36,7 +38,14 @@ function stagingOrigin() {
       !url.hash,
     'Use an HTTPS origin with no credentials, path, query or fragment.',
   );
-  assert.notEqual(hostname, 'driveshare-two.vercel.app', 'The production hostname is excluded.');
+  if (productionCheck) {
+    assert.ok(
+      !rehearsal && url.origin === 'https://' + productionHost,
+      'The explicit production check only supports the original DriveShare domain.',
+    );
+  } else {
+    assert.notEqual(hostname, productionHost, 'The production hostname requires explicit opt-in.');
+  }
   if (rehearsal) {
     assert.equal(url.origin, 'https://localhost:5180', 'Rehearsal is limited to localhost:5180.');
   } else {
@@ -49,7 +58,7 @@ function stagingOrigin() {
 }
 
 const check = expect.configure({ timeout: 20_000 });
-const get = (page, path) => page.request.get(path, { maxRedirects: 0 });
+const get = (page, path, options) => page.request.get(path, { ...options, maxRedirects: 0 });
 const spotCard = (page) =>
   page
     .locator('.parking-card')
@@ -119,7 +128,7 @@ async function verifyShell(page) {
   }
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
 
-  const health = await get(page, '/api/health');
+  const health = await get(page, '/api/health', { timeout: 125_000 });
   assert.equal(health.status(), 200, 'Staging backend health failed.');
   assert.match(health.headers()['content-type'] ?? '', /application\/json/i);
   assert.match(health.headers()['cache-control'] ?? '', /\bno-store\b/i);
@@ -128,6 +137,30 @@ async function verifyShell(page) {
     'ok',
     'The backend did not report a healthy database.',
   );
+}
+
+async function verifyUpload(host, origin) {
+  const session = await get(host, '/api/auth/me');
+  assert.equal(session.status(), 200);
+  const { csrf } = await session.json();
+  assert.ok(csrf, 'Host did not receive a CSRF token.');
+  const bytes = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+XKJkAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const saved = await host.request.post('/api/uploads', {
+    headers: { Origin: origin, 'X-CSRF-Token': csrf },
+    multipart: { image: { name: 'smoke.png', mimeType: 'image/png', buffer: bytes } },
+    maxRedirects: 0,
+  });
+  assert.equal(saved.status(), 201, 'Host image upload failed.');
+  const { url } = await saved.json();
+  assert.match(url, /^\/uploads\/[\da-f-]{36}\.png$/);
+  const image = await get(host, url);
+  assert.equal(image.status(), 200);
+  assert.match(image.headers()['content-type'] ?? '', /^image\/png/);
+  assert.deepEqual(await image.body(), bytes, 'Stored image content changed.');
+  console.log('Verified hosted image ' + url + '.');
 }
 
 async function availableInterval(page) {
@@ -176,7 +209,7 @@ async function cancelIfNeeded(page, bookingId, requestKey, origin) {
 }
 
 async function run() {
-  const origin = stagingOrigin();
+  const origin = targetOrigin();
   const hostname = new URL(origin).hostname;
   assert.ok(
     Object.values(passwords).every(Boolean),
@@ -214,6 +247,7 @@ async function run() {
     await login(driver, 'driver', '/', hostname);
     await login(host, 'owner', '/owner', hostname);
     await check(host.getByRole('heading', { name: 'Welcome home, Meera.' })).toBeVisible();
+    await verifyUpload(host, origin);
     await login(admin, 'admin', '/admin', hostname);
     await check(admin.getByRole('heading', { name: 'A clearer view.' })).toBeVisible();
     assert.equal(
@@ -233,6 +267,9 @@ async function run() {
       '10:00',
     );
     await driver.getByRole('button', { name: 'Find parking', exact: true }).click();
+    await driver.getByRole('button', { name: 'Map', exact: true }).click();
+    await check(driver.locator('.parking-map .leaflet-marker-icon').first()).toBeVisible();
+    await driver.getByRole('button', { name: 'List', exact: true }).click();
     await spotCard(driver).getByRole('link', { name: 'View details' }).click();
     const review = new URL(driver.url());
     assert.equal(review.pathname, '/explore/' + spotId);
@@ -306,7 +343,7 @@ async function run() {
     await check(admin.getByRole('heading', { name: 'Simulated payment records' })).toBeVisible();
     assert.deepEqual(browserErrors, [], 'The browser reported uncaught page errors.');
     console.log(
-      'Staging smoke passed: assets, health, secure login, driver/host/admin and slot release.',
+      'Hosted smoke passed: assets, health, secure role logins, map markers, uploads and slot release.',
     );
     console.log('Verified and cancelled hosted booking ' + bookingId + '.');
   } finally {

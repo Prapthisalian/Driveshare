@@ -1,57 +1,37 @@
-# DriveShare staging deployment
+# Deploy DriveShare on free tiers
 
-Use this guide from the **codex/online-deployment** checkout. The staging topology is a Vercel frontend, a Render Express service and private Render PostgreSQL in the same region as the service. The existing classroom checkout is independent.
+Use the isolated `codex/online-deployment` worktree. Vercel Hobby serves the unchanged Vite frontend, Render Free runs Express, Neon Free stores PostgreSQL data, and Cloudinary Free stores uploaded parking images. Keep the existing localhost checkout and its database for the offline demo.
 
-## Why the existing URL returns 404
+## Hosting limits
 
-Vercel returned its own `NOT_FOUND` for `/`, `/explore` and `/api/health`. GitHub records a successful Vercel deployment for `main` commit `c7f863b`. That commit contains only `README.md`, so it cannot produce an `index.html` or serve DriveShare. The source is on `codex/ui-redesign`, which had no Vercel deployment status when inspected. Vercel project access is needed to read the existing dashboard's exact root and output overrides. [GitHub deployment status](https://api.github.com/repos/Siddharth1968/driveshare/commits/c7f863bc5c131667380fe8e3896371473619b571/status) · [Vercel 404 documentation](https://vercel.com/kb/guide/why-is-my-deployed-project-giving-404).
+- Render Free shares 750 instance-hours per workspace each month. It sleeps after 15 minutes idle and usually takes about a minute to wake. Its filesystem is ephemeral. This Blueprint creates one free web service and runs guarded migrations at startup because free services have no pre-deploy command or shell. [Render Free](https://render.com/docs/free).
+- Neon Free includes 1 GB of PostgreSQL storage and 100 compute-unit hours per project monthly, subject to account limits. Compute can suspend when idle. Claimable projects expire after 72 hours unless claimed, and claiming rotates their connection credentials. [Neon Free](https://neon.com/docs/introduction/plans) · [Claimable Neon](https://neon.com/claimable-neon).
+- Cloudinary Free includes 25 monthly credits shared across storage, delivery and transformations. DriveShare retains its 5 MiB JPEG, PNG and WebP uploads and serves the original bytes at the same app URLs. Claimable clouds expire after 24 hours and limit delivery by source IP until claimed. [Cloudinary Free](https://cloudinary.com/pricing) · [Claimable Cloud](https://cloudinary.com/documentation/claimable_cloud_provisioning).
+- Vercel Hobby supports this noncommercial college demo. Its external proxy timeout is 120 seconds. A cold Render start can delay the first request. [Vercel Hobby](https://vercel.com/docs/plans/hobby) · [Proxy limits](https://vercel.com/docs/limits#proxied-request-timeout).
 
-## Provision a separate staging project
+## Set up staging
 
-1. Sign in to Vercel and create a **new** staging project with an available name, for example `driveshare-staging-siddharth1968`. Record its assigned public HTTPS domain. Leave the existing `driveshare` project, `driveshare-two.vercel.app` and its Git production branch in place. You can use the Vercel CLI from the deployment checkout. Replace the example name throughout with the project you created. [Vercel project CLI](https://vercel.com/docs/cli/project).
+1. In a Neon Free project, create a database named `driveshare_online`. Use the **direct** TLS connection string with connection pooling off. Use fresh credentials after claiming a temporary Neon project. Set the connection string as `DATABASE_URL` in the isolated deployment shell and in Render, and keep it out of Vercel and Git. [Neon Prisma guide](https://neon.com/docs/guides/prisma).
+2. Run the hosted database guard and migrations from the isolated checkout with `NODE_ENV=production`, `DEMO_MODE=false` and `DATABASE_URL` set. For bootstrap, set a unique `SESSION_SECRET` and three separate passwords of 16–72 UTF-8 bytes as private process variables. The accounts are `driver@driveshare.demo`, `owner@driveshare.demo`, and `admin@driveshare.demo`. Bootstrap also creates the driver's car and Sahyadri parking fixtures. It preserves existing rows on repeat runs.
 
    ```sh
-   vercel project add driveshare-staging-siddharth1968
-   vercel link --project driveshare-staging-siddharth1968
-   ```
-
-2. In Render, choose **New > Blueprint**, select `Siddharth1968/driveshare`, and choose **codex/online-deployment**. Review the paid compute, database and disk before applying the Blueprint. Set `APP_ORIGIN` to the exact staging frontend origin, including `https://` and without a trailing slash. The Blueprint generates the session secret, attaches a persistent upload disk, and supplies the private `DATABASE_URL` for `driveshare_online`. Its pre-deploy command checks the database target and applies both existing migrations. Wait for **Live** and a JSON response from the Render service's `/api/health`. [Render Blueprints](https://render.com/docs/infrastructure-as-code) · [Render pricing](https://render.com/pricing).
-
-3. In the Render service shell at the repository root, set three unique passwords of at least 16 characters and at most 72 UTF-8 bytes using private environment input. Use `DRIVESHARE_ONLINE_DRIVER_PASSWORD`, `DRIVESHARE_ONLINE_HOST_PASSWORD` and `DRIVESHARE_ONLINE_ADMIN_PASSWORD`. On Bash you can read them without echo or command history. Bootstrap seeds the three accounts, the driver's car and the fictional Sahyadri parking spaces in one transaction. It preserves existing rows on a successful rerun. [Render service shell](https://render.com/docs/ssh).
-
-   ```bash
-   read -rsp 'Online driver password: ' DRIVESHARE_ONLINE_DRIVER_PASSWORD; printf '\n'
-   read -rsp 'Online host password: ' DRIVESHARE_ONLINE_HOST_PASSWORD; printf '\n'
-   read -rsp 'Online admin password: ' DRIVESHARE_ONLINE_ADMIN_PASSWORD; printf '\n'
-   export DRIVESHARE_ONLINE_DRIVER_PASSWORD DRIVESHARE_ONLINE_HOST_PASSWORD DRIVESHARE_ONLINE_ADMIN_PASSWORD
+   node --import tsx apps/api/prisma/hosted-database.ts
+   npm run db:migrate
    DRIVESHARE_BOOTSTRAP=true node --import tsx apps/api/prisma/bootstrap-hosted.ts
-   unset DRIVESHARE_ONLINE_DRIVER_PASSWORD DRIVESHARE_ONLINE_HOST_PASSWORD DRIVESHARE_ONLINE_ADMIN_PASSWORD
    ```
 
-   The account emails are `driver@driveshare.demo`, `owner@driveshare.demo` and `admin@driveshare.demo`. Share the online passwords privately.
+   The password variables are `DRIVESHARE_ONLINE_DRIVER_PASSWORD`, `DRIVESHARE_ONLINE_HOST_PASSWORD` and `DRIVESHARE_ONLINE_ADMIN_PASSWORD`. Run bootstrap from the isolated deployment shell because Render Free has no shell. Use private environment input for all credentials.
 
-4. In the **new staging Vercel project**, set `DRIVESHARE_API_ORIGIN` to the Render service's public HTTPS origin. The Git and Vercel CLI project root is the repository root. The Vite install, build, and output values are `npm ci --include=dev`, `npm run build -w apps/web`, and `apps/web/dist`. Vercel rewrites API and upload requests to Render and serves the SPA for direct navigation to client routes. The browser keeps the session cookie on the staging frontend origin. [Vercel programmatic configuration](https://vercel.com/docs/project-configuration/vercel-ts) · [External rewrites](https://vercel.com/docs/routing/rewrites).
+3. Sign in to Vercel and create a separate Hobby staging project. Record its public HTTPS frontend origin. In Render, apply the Blueprint from **codex/online-deployment**. Confirm it lists a single **Free** web service. Set `APP_ORIGIN` to the staging frontend origin without a trailing slash, provide the Neon `DATABASE_URL`, and supply `DRIVESHARE_CLOUDINARY_NAME`, `DRIVESHARE_CLOUDINARY_API_KEY`, and `DRIVESHARE_CLOUDINARY_API_SECRET` from the claimed Cloudinary Free environment. Render generates a separate session secret. Wait for the Render service to be Live and its `/api/health` to return `{"status":"ok"}`. [Render Blueprints](https://render.com/docs/infrastructure-as-code).
+4. In the staging Vercel project, use the repository root and set `DRIVESHARE_API_ORIGIN` to the actual Render HTTPS origin. `vercel.mjs` builds `apps/web/dist`, proxies `/api` and `/uploads` to Render, and serves the SPA on valid client routes. This keeps Secure session cookies and CSRF checks on the frontend origin. [Vercel rewrites](https://vercel.com/docs/routing/rewrites).
+5. Run `npm ci` and `npx playwright install chromium` in the deployment checkout. Set `DRIVESHARE_STAGING_URL` to the staging origin and supply the three private demo passwords. Run `node scripts/smoke-hosted.mjs`. It tests the built frontend, direct refresh, database health, all three secure logins, mobile map markers, a 24-hour booking with the same driver and host ID, cancellation, refunded availability, and a real image upload. It leaves one cancelled reservation and a small test image.
 
-   With the new staging project linked and the variable set in its Production environment, run:
+## Publish to the existing Vercel project
 
-   ```sh
-   vercel deploy --prod --project driveshare-staging-siddharth1968
-   ```
+After staging passes, deploy the verified commit to the existing `driveshare` Vercel project with the real `DRIVESHARE_API_ORIGIN` configured. For a CLI release, use `vercel deploy --prod --skip-domain` from the verified worktree. Inspect the new deployment, point Render's `APP_ORIGIN` at `https://driveshare-two.vercel.app`, then use `vercel promote <deployment-url>` to assign the original domain. Retain prior Vercel deployment history and the Git branches. Run the hosted smoke again with `DRIVESHARE_VERIFY_PRODUCTION=true` and `DRIVESHARE_STAGING_URL=https://driveshare-two.vercel.app` for the authorized production check. [Vercel deployment promotion](https://vercel.com/docs/deployments/promoting-a-deployment).
 
-   This assigns the stable public domain of the separate staging project. If the assigned origin differs from `APP_ORIGIN`, correct the Render variable, redeploy that service, and verify again before testing sign-in.
+## Verification on 11 November 2026
 
-## Verify staging
+Both original Prisma migrations ran against the isolated Singapore Neon database over direct TLS. SQL verified eight business tables, 49 validated constraints, `btree_gist`, the exclusion constraints, and the occupancy and payment indexes. Bootstrapping the hosted demo twice preserved the existing data. The production-mode browser rehearsal ran through a loopback HTTPS frontend and used real Neon and Cloudinary services. Driver, host and administrator login, booking ID matching, cancellation and slot release, map markers, and a byte-for-byte image upload passed. The regression suite passed **97 API and storage tests and 12 browser tests**. The dependency audit reported zero known vulnerabilities. The official Render schema accepted the Free Blueprint.
 
-From the deployment checkout, run `npm ci` and `npx playwright install chromium`. Set `DRIVESHARE_STAGING_URL` to the public staging frontend origin. Supply the same three hosted passwords as private process variables, then run `node scripts/smoke-hosted.mjs`. The script verifies the Vite assets and deep links, database health through the API proxy, Secure cookies, separate role sessions, booking ID matching, cancellation and released availability. It creates and cancels a simulated reservation in staging. Use the staging URL on a phone to confirm reachability outside the hosting dashboards.
-
-For regression tests against a disposable database, set `TEST_DATABASE_URL` and `DATABASE_URL` to the dedicated test PostgreSQL URL with a database name ending in `_test`, then run `npm run db:migrate`, `npm run check` and `npm run test:e2e` in that order. The existing browser and database suites reset their selected test database. The staging smoke script uses HTTP and leaves the cancelled booking in staging history.
-
-Get the repository owner's approval for the production switch after staging passes. The original Vercel URL still serves its previous deployment until the owner approves that switch.
-
-## Verification record
-
-- The original checkout served the home and explore routes, database health, and seven Adyar listings during a native read-only smoke check. PostgreSQL reported `default_transaction_read_only=on` for the API session. Its temporary verification processes were stopped afterward. The Docker CLI was unavailable for this check.
-- The deployment checkout passed type checks, production builds, **92 API and database tests**, and **12 browser tests**. npm audit reported zero known vulnerabilities.
-- The Render Blueprint passed Render's published JSON schema. Vercel's route parser verified the home, direct React routes, static assets, API and upload routing.
-- In a separate HTTPS rehearsal, the three hosted accounts logged in with Secure cookies. The driver selected 24 hours in IST and booked Riverside Court on a mobile viewport. The desktop host saw the same booking ID and cancellation. The original interval reopened, and direct SQL verified the cancelled booking, the amount of ₹840, and the eight business tables in the rehearsal database. An authenticated upload also round-tripped through the proxy and configured disk directory. Both existing migrations applied to the disposable database, and the hosted bootstrap rerun preserved data.
-- The public frontend, backend and managed database await provider provisioning. Run the same browser smoke script against the real staging URL before approving any switch.
+The original Vercel domain serves a 404 from its README-only deployment. Public staging and promotion require authenticated hosting access. Keep the hosted smoke results separate from the loopback rehearsal.

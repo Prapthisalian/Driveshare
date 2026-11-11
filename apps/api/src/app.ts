@@ -15,6 +15,7 @@ import { now, setDemoTime } from './clock.js';
 import { demo, production, settings } from './config.js';
 import { optionalAuth, requireAuth, role, issueSession, publicUser } from './auth.js';
 import { AppError, ensure } from './errors.js';
+import { cloudinaryImageStore, imageHeaders, maxImageBytes } from './image-storage.js';
 import * as v from './validation.js';
 import { active, coveredBySchedule, distanceKm, validateInterval } from './policies.js';
 import {
@@ -33,6 +34,7 @@ import {
 } from './engine.js';
 
 const uploadDir = resolve(process.env.DRIVESHARE_UPLOAD_DIR ?? 'uploads');
+const hostedImages = cloudinaryImageStore();
 
 export const app = express();
 app.disable('x-powered-by');
@@ -59,16 +61,27 @@ app.use((req, _res, next) => {
   next();
 });
 app.use('/api', optionalAuth);
-app.use(
-  '/uploads',
-  express.static(uploadDir, {
-    dotfiles: 'deny',
-    setHeaders: (res) => {
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('Content-Security-Policy', "default-src 'none'; sandbox");
-    },
-  }),
-);
+if (hostedImages) {
+  app.get('/uploads/:filename', async (req, res) => {
+    const image = await hostedImages.read(req.params.filename);
+    ensure(image, 404, 'Image not found.');
+    res
+      .set(imageHeaders)
+      .set('Cache-Control', 'public, max-age=31536000, immutable')
+      .type(image.contentType)
+      .send(image.body);
+  });
+} else {
+  app.use(
+    '/uploads',
+    express.static(uploadDir, {
+      dotfiles: 'deny',
+      setHeaders: (res) => {
+        for (const [name, value] of Object.entries(imageHeaders)) res.setHeader(name, value);
+      },
+    }),
+  );
+}
 const id = (req: Request) => v.uuid.parse(req.params.id);
 const authRate = rateLimit({
   windowMs: 15 * 60000,
@@ -391,7 +404,7 @@ app.patch('/api/spots/:id', requireAuth, role('OWNER'), async (req, res) => {
 });
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { fileSize: maxImageBytes, files: 1 },
 });
 app.post('/api/uploads', requireAuth, role('OWNER'), upload.single('image'), async (req, res) => {
   ensure(req.file, 400, 'Choose an image up to 5 MB.');
@@ -406,8 +419,12 @@ app.post('/api/uploads', requireAuth, role('OWNER'), upload.single('image'), asy
           : null;
   ensure(ext, 400, 'Only JPEG, PNG and WebP images are supported.');
   const filename = `${randomUUID()}.${ext}`;
-  await mkdir(uploadDir, { recursive: true });
-  await writeFile(resolve(uploadDir, filename), b, { flag: 'wx' });
+  if (hostedImages) {
+    await hostedImages.save(filename, b, ext);
+  } else {
+    await mkdir(uploadDir, { recursive: true });
+    await writeFile(resolve(uploadDir, filename), b, { flag: 'wx' });
+  }
   res.status(201).json({ url: `/uploads/${filename}` });
 });
 app.put('/api/spots/:id/availability', requireAuth, role('OWNER'), async (req, res) => {
