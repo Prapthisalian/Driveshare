@@ -32,8 +32,15 @@ import {
   alertWaiters,
 } from './engine.js';
 
+const uploadDir = resolve(process.env.DRIVESHARE_UPLOAD_DIR ?? 'uploads');
+
 export const app = express();
 app.disable('x-powered-by');
+if (production)
+  app.use('/api', (_req, res, next) => {
+    res.set('Cache-Control', 'private, no-store');
+    next();
+  });
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
@@ -54,7 +61,7 @@ app.use((req, _res, next) => {
 app.use('/api', optionalAuth);
 app.use(
   '/uploads',
-  express.static(resolve('uploads'), {
+  express.static(uploadDir, {
     dotfiles: 'deny',
     setHeaders: (res) => {
       res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -399,8 +406,8 @@ app.post('/api/uploads', requireAuth, role('OWNER'), upload.single('image'), asy
           : null;
   ensure(ext, 400, 'Only JPEG, PNG and WebP images are supported.');
   const filename = `${randomUUID()}.${ext}`;
-  await mkdir(resolve('uploads'), { recursive: true });
-  await writeFile(resolve('uploads', filename), b, { flag: 'wx' });
+  await mkdir(uploadDir, { recursive: true });
+  await writeFile(resolve(uploadDir, filename), b, { flag: 'wx' });
   res.status(201).json({ url: `/uploads/${filename}` });
 });
 app.put('/api/spots/:id/availability', requireAuth, role('OWNER'), async (req, res) => {
